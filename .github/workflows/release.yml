@@ -1,0 +1,30 @@
+name: Publish NeoMeme APK
+# Lives in the PUBLIC repo (e.g. NeoMemeApp/neomeme-android). Claude starts it with the EAS artifact URL of an
+# `apk` build; it publishes the APK as the latest release so https://neomeme.io/android.apk (Netlify redirect to
+# .../releases/latest/download/NeoMeme.apk) always serves the newest version. No secret needed.
+on:
+  workflow_dispatch:
+    inputs:
+      apk_url:
+        description: EAS artifact URL (https://expo.dev/artifacts/eas/....apk)
+      version:
+        description: release tag, e.g. 1.0.0-build-7
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download
+        run: |
+          case "${{ inputs.apk_url }}" in https://expo.dev/artifacts/*|https://*.expo.dev/*) ;; *) echo "not an EAS artifact URL"; exit 1;; esac
+          curl -fsSL "${{ inputs.apk_url }}" -o NeoMeme.apk
+          test $(stat -c%s NeoMeme.apk) -gt 10000000
+          sha256sum NeoMeme.apk | tee SHA256.txt
+      - name: Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ inputs.version }}" NeoMeme.apk SHA256.txt --repo "${{ github.repository }}" \
+            --title "NeoMeme for Android ${{ inputs.version }}" \
+            --notes "Official NeoMeme Android app. Download only from https://neomeme.io" --latest
